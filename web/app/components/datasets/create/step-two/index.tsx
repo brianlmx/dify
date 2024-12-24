@@ -658,31 +658,32 @@ const StepTwo = ({
                     </div>
                   ))}
                   {IS_CE_EDITION && <>
-                    <div className='flex items-center'>
-                      <Checkbox
-                        checked={docForm === ChunkingMode.qa}
-                        onCheck={() => {
-                          if (docForm === ChunkingMode.qa)
-                            handleChangeDocform(ChunkingMode.text)
-                          else
-                            handleChangeDocform(ChunkingMode.qa)
-                        }}
-                      />
-                      <div className='flex items-center gap-1'>
+                    <Divider type='horizontal' className='my-4 bg-divider-subtle' />
+                    <div className='flex items-center py-0.5'>
+                      <div className='flex items-center' onClick={() => {
+                        if (currentDataset?.doc_form)
+                          return
+                        if (docForm === ChunkingMode.qa)
+                          handleChangeDocform(ChunkingMode.text)
+                        else
+                          handleChangeDocform(ChunkingMode.qa)
+                      }}>
+                        <Checkbox
+                          checked={currentDocForm === ChunkingMode.qa}
+                          disabled={!!currentDataset?.doc_form}
+                        />
                         <label className="ml-2 system-sm-regular cursor-pointer text-text-secondary">
                           {t('datasetCreation.stepTwo.useQALanguage')}
                         </label>
-                        <div className='z-50 relative'>
-                          <LanguageSelect
-                            currentLanguage={docLanguage || locale}
-                            onSelect={setDocLanguage}
-                            disabled={isLanguageSelectDisabled}
-                          />
-                        </div>
-                        <Tooltip popupContent={t('datasetCreation.stepTwo.QATip')} />
                       </div>
+                      <LanguageSelect
+                        currentLanguage={docLanguage || locale}
+                        onSelect={setDocLanguage}
+                        disabled={currentDocForm !== ChunkingMode.qa}
+                      />
+                      <Tooltip popupContent={t('datasetCreation.stepTwo.QATip')} />
                     </div>
-                    {docForm === ChunkingMode.qa && (
+                    {currentDocForm === ChunkingMode.qa && (
                       <div
                         style={{
                           background: 'linear-gradient(92deg, rgba(247, 144, 9, 0.1) 0%, rgba(255, 255, 255, 0.00) 100%)',
@@ -924,7 +925,7 @@ const StepTwo = ({
               </PortalToFollowElem>
             </>)}
         </div>
-        {indexType === IndexingType.QUALIFIED && (
+        {!hasSetIndexType && indexType === IndexingType.QUALIFIED && (
           <div className='mt-2 h-10 p-2 flex items-center gap-x-0.5 rounded-xl border-[0.5px] border-components-panel-border overflow-hidden bg-components-panel-bg-blur backdrop-blur-[5px] shadow-xs'>
             <div className='absolute top-0 left-0 right-0 bottom-0 bg-[linear-gradient(92deg,rgba(247,144,9,0.25)_0%,rgba(255,255,255,0.00)_100%)] opacity-40'></div>
             <div className='p-1'>
@@ -1088,8 +1089,14 @@ const StepTwo = ({
           mainClassName='space-y-6'
         >
           {currentDocForm === ChunkingMode.qa && estimate?.qa_preview && (
-            estimate?.qa_preview.map(item => (
-              <QAPreview key={item.question} qa={item} />
+            estimate?.qa_preview.map((item, index) => (
+              <ChunkContainer
+                key={item.question}
+                label={`Chunk-${index + 1}`}
+                characterCount={item.question.length + item.answer.length}
+              >
+                <QAPreview qa={item} />
+              </ChunkContainer>
             ))
           )}
           {currentDocForm === ChunkingMode.text && estimate?.preview && (
