@@ -6,10 +6,6 @@ import time
 import uuid
 from typing import Any, Optional
 
-from flask_login import current_user
-from sqlalchemy import func
-from werkzeug.exceptions import NotFound
-
 from configs import dify_config
 from core.errors.error import LLMBadRequestError, ProviderTokenNotInitError
 from core.model_manager import ModelManager
@@ -20,32 +16,21 @@ from events.dataset_event import dataset_was_deleted
 from events.document_event import document_was_deleted
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
+from flask_login import current_user  # type: ignore
 from libs import helper
 from models.account import Account, TenantAccountRole
-from models.dataset import (
-    AppDatasetJoin,
-    ChildChunk,
-    Dataset,
-    DatasetAutoDisableLog,
-    DatasetCollectionBinding,
-    DatasetPermission,
-    DatasetPermissionEnum,
-    DatasetProcessRule,
-    DatasetQuery,
-    Document,
-    DocumentSegment,
-    ExternalKnowledgeBindings,
-)
+from models.dataset import (AppDatasetJoin, ChildChunk, Dataset,
+                            DatasetAutoDisableLog, DatasetCollectionBinding,
+                            DatasetPermission, DatasetPermissionEnum,
+                            DatasetProcessRule, DatasetQuery, Document,
+                            DocumentSegment, ExternalKnowledgeBindings)
 from models.model import UploadFile
 from models.source import DataSourceOauthBinding
 from services.entities.knowledge_entities.knowledge_entities import (
-    ChildChunkUpdateArgs,
-    KnowledgeConfig,
-    RetrievalModel,
-    SegmentUpdateArgs,
-)
+    ChildChunkUpdateArgs, KnowledgeConfig, RetrievalModel, SegmentUpdateArgs)
 from services.errors.account import InvalidActionError, NoPermissionError
-from services.errors.chunk import ChildChunkDeleteIndexError, ChildChunkIndexingError
+from services.errors.chunk import (ChildChunkDeleteIndexError,
+                                   ChildChunkIndexingError)
 from services.errors.dataset import DatasetNameDuplicateError
 from services.errors.document import DocumentIndexingError
 from services.errors.file import FileNotExistsError
@@ -53,19 +38,25 @@ from services.external_knowledge_service import ExternalDatasetService
 from services.feature_service import FeatureModel, FeatureService
 from services.tag_service import TagService
 from services.vector_service import VectorService
+from sqlalchemy import func
 from tasks.batch_clean_document_task import batch_clean_document_task
 from tasks.clean_notion_document_task import clean_notion_document_task
 from tasks.deal_dataset_vector_index_task import deal_dataset_vector_index_task
 from tasks.delete_segment_from_index_task import delete_segment_from_index_task
-from tasks.disable_segment_from_index_task import disable_segment_from_index_task
-from tasks.disable_segments_from_index_task import disable_segments_from_index_task
+from tasks.disable_segment_from_index_task import \
+    disable_segment_from_index_task
+from tasks.disable_segments_from_index_task import \
+    disable_segments_from_index_task
 from tasks.document_indexing_task import document_indexing_task
 from tasks.document_indexing_update_task import document_indexing_update_task
-from tasks.duplicate_document_indexing_task import duplicate_document_indexing_task
+from tasks.duplicate_document_indexing_task import \
+    duplicate_document_indexing_task
 from tasks.enable_segments_to_index_task import enable_segments_to_index_task
 from tasks.recover_document_indexing_task import recover_document_indexing_task
 from tasks.retry_document_indexing_task import retry_document_indexing_task
-from tasks.sync_website_document_indexing_task import sync_website_document_indexing_task
+from tasks.sync_website_document_indexing_task import \
+    sync_website_document_indexing_task
+from werkzeug.exceptions import NotFound
 
 
 class DatasetService:
@@ -198,8 +189,9 @@ class DatasetService:
         return dataset
 
     @staticmethod
-    def get_dataset(dataset_id) -> Dataset:
-        return Dataset.query.filter_by(id=dataset_id).first()
+    def get_dataset(dataset_id) -> Optional[Dataset]:
+        dataset: Optional[Dataset] = Dataset.query.filter_by(id=dataset_id).first()
+        return dataset
 
     @staticmethod
     def check_dataset_model_setting(dataset):
@@ -240,6 +232,8 @@ class DatasetService:
     @staticmethod
     def update_dataset(dataset_id, data, user):
         dataset = DatasetService.get_dataset(dataset_id)
+        if not dataset:
+            raise ValueError("Dataset not found")
 
         DatasetService.check_dataset_permission(dataset, user)
         if dataset.provider == "external":
@@ -383,7 +377,13 @@ class DatasetService:
                 raise NoPermissionError("You do not have permission to access this dataset.")
 
     @staticmethod
-    def check_dataset_operator_permission(user: Account = None, dataset: Dataset = None):
+    def check_dataset_operator_permission(user: Optional[Account] = None, dataset: Optional[Dataset] = None):
+        if not dataset:
+            raise ValueError("Dataset not found")
+
+        if not user:
+            raise ValueError("User not found")
+
         if dataset.permission == DatasetPermissionEnum.ONLY_ME:
             if dataset.created_by != user.id:
                 raise NoPermissionError("You do not have permission to access this dataset.")
@@ -539,12 +539,14 @@ class DocumentService:
     }
 
     @staticmethod
-    def get_document(dataset_id: str, document_id: str) -> Optional[Document]:
-        document = (
-            db.session.query(Document).filter(Document.id == document_id, Document.dataset_id == dataset_id).first()
-        )
-
-        return document
+    def get_document(dataset_id: str, document_id: Optional[str] = None) -> Optional[Document]:
+        if document_id:
+            document = (
+                db.session.query(Document).filter(Document.id == document_id, Document.dataset_id == dataset_id).first()
+            )
+            return document
+        else:
+            return None
 
     @staticmethod
     def get_document_by_id(document_id: str) -> Optional[Document]:
@@ -749,7 +751,7 @@ class DocumentService:
                 if count > batch_upload_limit:
                     raise ValueError(f"You have reached the batch upload limit of {batch_upload_limit}.")
 
-                DocumentService.check_documents_upload_quota(count, features)
+                    DocumentService.check_documents_upload_quota(count, features)
 
         # if dataset is empty, update dataset data_source_type
         if not dataset.data_source_type:
@@ -1050,9 +1052,10 @@ class DocumentService:
                     rules=json.dumps(DatasetProcessRule.AUTOMATIC_RULES),
                     created_by=account.id,
                 )
-            db.session.add(dataset_process_rule)
-            db.session.commit()
-            document.dataset_process_rule_id = dataset_process_rule.id
+            if dataset_process_rule is not None:
+                db.session.add(dataset_process_rule)
+                db.session.commit()
+                document.dataset_process_rule_id = dataset_process_rule.id
         # update document data source
         if document_data.data_source:
             file_name = ""
@@ -1672,8 +1675,8 @@ class SegmentService:
             segment.status = "error"
             segment.error = str(e)
             db.session.commit()
-        segment = db.session.query(DocumentSegment).filter(DocumentSegment.id == segment.id).first()
-        return segment
+        new_segment = db.session.query(DocumentSegment).filter(DocumentSegment.id == segment.id).first()
+        return new_segment
 
     @classmethod
     def delete_segment(cls, segment: DocumentSegment, document: Document, dataset: Dataset):
@@ -1985,6 +1988,8 @@ class DatasetCollectionBindingService:
             .order_by(DatasetCollectionBinding.created_at)
             .first()
         )
+        if not dataset_collection_binding:
+            raise ValueError("Dataset collection binding not found")
 
         return dataset_collection_binding
 

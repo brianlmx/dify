@@ -3,32 +3,33 @@ import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Optional, cast
+from uuid import uuid4
 
-from core.app.apps.advanced_chat.app_config_manager import AdvancedChatAppConfigManager
+from core.app.apps.advanced_chat.app_config_manager import \
+    AdvancedChatAppConfigManager
 from core.app.apps.workflow.app_config_manager import WorkflowAppConfigManager
 from core.model_runtime.utils.encoders import jsonable_encoder
 from core.variables import Variable
-from core.workflow.entities.node_entities import NodeRunMetadataKey, NodeRunResult
+from core.workflow.entities.node_entities import (NodeRunMetadataKey,
+                                                  NodeRunResult)
 from core.workflow.errors import WorkflowNodeRunFailedError
 from core.workflow.nodes import NodeType
 from core.workflow.nodes.base.entities import BaseNodeData
 from core.workflow.nodes.base.node import BaseNode
 from core.workflow.nodes.enums import ErrorStrategy
 from core.workflow.nodes.event import RunCompletedEvent
-from core.workflow.nodes.node_mapping import LATEST_VERSION, NODE_TYPE_CLASSES_MAPPING
+from core.workflow.nodes.node_mapping import (LATEST_VERSION,
+                                              NODE_TYPE_CLASSES_MAPPING)
 from core.workflow.workflow_entry import WorkflowEntry
-from events.app_event import app_draft_workflow_was_synced, app_published_workflow_was_updated
+from events.app_event import (app_draft_workflow_was_synced,
+                              app_published_workflow_was_updated)
 from extensions.ext_database import db
 from models.account import Account
 from models.enums import CreatedByRole
 from models.model import App, AppMode
-from models.workflow import (
-    Workflow,
-    WorkflowNodeExecution,
-    WorkflowNodeExecutionStatus,
-    WorkflowNodeExecutionTriggeredFrom,
-    WorkflowType,
-)
+from models.workflow import (Workflow, WorkflowNodeExecution,
+                             WorkflowNodeExecutionStatus,
+                             WorkflowNodeExecutionTriggeredFrom, WorkflowType)
 from services.errors.app import WorkflowHashNotEqualError
 from services.workflow.workflow_converter import WorkflowConverter
 
@@ -255,6 +256,7 @@ class WorkflowService:
             error = e.error
 
         workflow_node_execution = WorkflowNodeExecution()
+        workflow_node_execution.id = str(uuid4())
         workflow_node_execution.tenant_id = app_model.tenant_id
         workflow_node_execution.app_id = app_model.id
         workflow_node_execution.workflow_id = draft_workflow.id
@@ -316,7 +318,7 @@ class WorkflowService:
             raise ValueError(f"Current App mode: {app_model.mode} is not supported convert to workflow.")
 
         # convert to workflow
-        new_app = workflow_converter.convert_to_workflow(
+        new_app: App = workflow_converter.convert_to_workflow(
             app_model=app_model,
             account=account,
             name=args.get("name", "Default Name"),

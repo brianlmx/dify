@@ -9,14 +9,15 @@ import pickle
 import re
 import time
 from json import JSONDecodeError
-
-from sqlalchemy import func
-from sqlalchemy.dialects.postgresql import JSONB
+from typing import Any, cast
 
 from configs import dify_config
 from core.rag.retrieval.retrieval_methods import RetrievalMethod
 from extensions.ext_storage import storage
-from services.entities.knowledge_entities.knowledge_entities import ParentMode, Rule
+from services.entities.knowledge_entities.knowledge_entities import (
+    ParentMode, Rule)
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .account import Account
 from .engine import db
@@ -30,7 +31,7 @@ class DatasetPermissionEnum(enum.StrEnum):
     PARTIAL_TEAM = "partial_members"
 
 
-class Dataset(db.Model):
+class Dataset(db.Model):  # type: ignore[name-defined]
     __tablename__ = "datasets"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_pkey"),
@@ -201,7 +202,7 @@ class Dataset(db.Model):
         return f"Vector_index_{normalized_dataset_id}_Node"
 
 
-class DatasetProcessRule(db.Model):
+class DatasetProcessRule(db.Model):  # type: ignore[name-defined]
     __tablename__ = "dataset_process_rules"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_process_rule_pkey"),
@@ -217,7 +218,7 @@ class DatasetProcessRule(db.Model):
 
     MODES = ["automatic", "custom", "hierarchical"]
     PRE_PROCESSING_RULES = ["remove_stopwords", "remove_extra_spaces", "remove_urls_emails"]
-    AUTOMATIC_RULES = {
+    AUTOMATIC_RULES: dict[str, Any] = {
         "pre_processing_rules": [
             {"id": "remove_extra_spaces", "enabled": True},
             {"id": "remove_urls_emails", "enabled": False},
@@ -241,7 +242,7 @@ class DatasetProcessRule(db.Model):
             return None
 
 
-class Document(db.Model):
+class Document(db.Model):  # type: ignore[name-defined]
     __tablename__ = "documents"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="document_pkey"),
@@ -497,7 +498,7 @@ class Document(db.Model):
         )
 
 
-class DocumentSegment(db.Model):
+class DocumentSegment(db.Model):  # type: ignore[name-defined]
     __tablename__ = "document_segments"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="document_segment_pkey"),
@@ -621,7 +622,7 @@ class DocumentSegment(db.Model):
         # Reconstruct the text with signed URLs
         offset = 0
         for start, end, signed_url in signed_urls:
-            text = text[: start + offset] + signed_url + text[end + offset :]
+            text = text[: start + offset] + signed_url + text[end + offset:]
             offset += len(signed_url) - (end - start)
 
         return text
@@ -685,7 +686,7 @@ class AppDatasetJoin(db.Model):
         return db.session.get(App, self.app_id)
 
 
-class DatasetQuery(db.Model):
+class DatasetQuery(db.Model):  # type: ignore[name-defined]
     __tablename__ = "dataset_queries"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_query_pkey"),
@@ -702,7 +703,7 @@ class DatasetQuery(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
 
-class DatasetKeywordTable(db.Model):
+class DatasetKeywordTable(db.Model):  # type: ignore[name-defined]
     __tablename__ = "dataset_keyword_tables"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_keyword_table_pkey"),
@@ -747,7 +748,7 @@ class DatasetKeywordTable(db.Model):
                 return None
 
 
-class Embedding(db.Model):
+class Embedding(db.Model):  # type: ignore[name-defined]
     __tablename__ = "embeddings"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="embedding_pkey"),
@@ -768,10 +769,10 @@ class Embedding(db.Model):
         self.embedding = pickle.dumps(embedding_data, protocol=pickle.HIGHEST_PROTOCOL)
 
     def get_embedding(self) -> list[float]:
-        return pickle.loads(self.embedding)
+        return cast(list[float], pickle.loads(self.embedding))
 
 
-class DatasetCollectionBinding(db.Model):
+class DatasetCollectionBinding(db.Model):  # type: ignore[name-defined]
     __tablename__ = "dataset_collection_bindings"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_collection_bindings_pkey"),
@@ -786,7 +787,7 @@ class DatasetCollectionBinding(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-class TidbAuthBinding(db.Model):
+class TidbAuthBinding(db.Model):  # type: ignore[name-defined]
     __tablename__ = "tidb_auth_bindings"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="tidb_auth_bindings_pkey"),
@@ -806,7 +807,7 @@ class TidbAuthBinding(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-class Whitelist(db.Model):
+class Whitelist(db.Model):  # type: ignore[name-defined]
     __tablename__ = "whitelists"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="whitelists_pkey"),
@@ -818,7 +819,7 @@ class Whitelist(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-class DatasetPermission(db.Model):
+class DatasetPermission(db.Model):  # type: ignore[name-defined]
     __tablename__ = "dataset_permissions"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="dataset_permission_pkey"),
@@ -835,7 +836,7 @@ class DatasetPermission(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-class ExternalKnowledgeApis(db.Model):
+class ExternalKnowledgeApis(db.Model):  # type: ignore[name-defined]
     __tablename__ = "external_knowledge_apis"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="external_knowledge_apis_pkey"),
@@ -888,7 +889,7 @@ class ExternalKnowledgeApis(db.Model):
         return dataset_bindings
 
 
-class ExternalKnowledgeBindings(db.Model):
+class ExternalKnowledgeBindings(db.Model):  # type: ignore[name-defined]
     __tablename__ = "external_knowledge_bindings"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="external_knowledge_bindings_pkey"),

@@ -3,16 +3,17 @@ import logging
 import time
 
 import click
-from celery import shared_task
-from werkzeug.exceptions import NotFound
-
+from celery import shared_task  # type: ignore
 from core.rag.index_processor.constant.index_type import IndexType
-from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
+from core.rag.index_processor.index_processor_factory import \
+    IndexProcessorFactory
 from core.rag.models.document import ChildDocument, Document
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from models.dataset import DatasetAutoDisableLog, Document as DatasetDocument
+from models.dataset import DatasetAutoDisableLog
+from models.dataset import Document as DatasetDocument
 from models.dataset import DocumentSegment
+from werkzeug.exceptions import NotFound
 
 
 @shared_task(queue="dataset")

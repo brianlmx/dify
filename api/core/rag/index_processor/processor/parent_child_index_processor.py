@@ -14,7 +14,8 @@ from core.rag.models.document import ChildDocument, Document
 from extensions.ext_database import db
 from libs import helper
 from models.dataset import ChildChunk, Dataset, DocumentSegment
-from services.entities.knowledge_entities.knowledge_entities import ParentMode, Rule
+from services.entities.knowledge_entities.knowledge_entities import (
+    ParentMode, Rule)
 
 
 class ParentChildIndexProcessor(BaseIndexProcessor):

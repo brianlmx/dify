@@ -6,16 +6,12 @@ import re
 import threading
 import time
 import uuid
-from typing import Optional, cast
-
-from flask import current_app
-from flask_login import current_user
-from sqlalchemy.orm.exc import ObjectDeletedError
+from typing import Any, Optional, cast
 
 from configs import dify_config
-from core.entities.knowledge_entities import IndexingEstimate, PreviewDetail, QAPreviewDetail
+from core.entities.knowledge_entities import (IndexingEstimate, PreviewDetail,
+                                              QAPreviewDetail)
 from core.errors.error import ProviderTokenNotInitError
-from core.llm_generator.llm_generator import LLMGenerator
 from core.model_manager import ModelInstance, ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from core.rag.cleaner.clean_processor import CleanProcessor
@@ -24,22 +20,25 @@ from core.rag.docstore.dataset_docstore import DatasetDocumentStore
 from core.rag.extractor.entity.extract_setting import ExtractSetting
 from core.rag.index_processor.constant.index_type import IndexType
 from core.rag.index_processor.index_processor_base import BaseIndexProcessor
-from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
+from core.rag.index_processor.index_processor_factory import \
+    IndexProcessorFactory
 from core.rag.models.document import ChildDocument, Document
 from core.rag.splitter.fixed_text_splitter import (
-    EnhanceRecursiveCharacterTextSplitter,
-    FixedRecursiveCharacterTextSplitter,
-)
+    EnhanceRecursiveCharacterTextSplitter, FixedRecursiveCharacterTextSplitter)
 from core.rag.splitter.text_splitter import TextSplitter
 from core.tools.utils.web_reader_tool import get_image_upload_file_ids
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
 from extensions.ext_storage import storage
+from flask import current_app
+from flask_login import current_user
 from libs import helper
-from models.dataset import ChildChunk, Dataset, DatasetProcessRule, DocumentSegment
+from models.dataset import ChildChunk, Dataset, DatasetProcessRule
 from models.dataset import Document as DatasetDocument
+from models.dataset import DocumentSegment
 from models.model import UploadFile
 from services.feature_service import FeatureService
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 
 class IndexingRunner:
@@ -63,6 +62,8 @@ class IndexingRunner:
                     .filter(DatasetProcessRule.id == dataset_document.dataset_process_rule_id)
                     .first()
                 )
+                if not processing_rule:
+                    raise ValueError("no process rule found")
                 index_type = dataset_document.doc_form
                 index_processor = IndexProcessorFactory(index_type).init_index_processor()
                 # extract
@@ -124,6 +125,8 @@ class IndexingRunner:
                 .filter(DatasetProcessRule.id == dataset_document.dataset_process_rule_id)
                 .first()
             )
+            if not processing_rule:
+                raise ValueError("no process rule found")
 
             index_type = dataset_document.doc_form
             index_processor = IndexProcessorFactory(index_type).init_index_processor()
@@ -296,7 +299,7 @@ class IndexingRunner:
             for document in documents:
                 if len(preview_texts) < 10:
                     if doc_form and doc_form == "qa_model":
-                        preview_detail = QAPreviewDetail(question=document.page_content, 
+                        preview_detail = QAPreviewDetail(question=document.page_content,
                                                          answer=document.metadata.get("answer")
                                                          )
                         preview_texts.append(preview_detail)
@@ -311,7 +314,8 @@ class IndexingRunner:
                 for upload_file_id in image_upload_file_ids:
                     image_file = db.session.query(UploadFile).filter(UploadFile.id == upload_file_id).first()
                     try:
-                        storage.delete(image_file.key)
+                        if image_file:
+                            storage.delete(image_file.key)
                     except Exception:
                         logging.exception(
                             "Delete image_files failed while indexing_estimate, \
@@ -400,8 +404,9 @@ class IndexingRunner:
         # replace doc id to document model id
         text_docs = cast(list[Document], text_docs)
         for text_doc in text_docs:
-            text_doc.metadata["document_id"] = dataset_document.id
-            text_doc.metadata["dataset_id"] = dataset_document.dataset_id
+            if text_doc.metadata is not None:
+                text_doc.metadata["document_id"] = dataset_document.id
+                text_doc.metadata["dataset_id"] = dataset_document.dataset_id
 
         return text_docs
 
@@ -443,9 +448,10 @@ class IndexingRunner:
             )
         else:
             # Automatic segmentation
+            automatic_rules: dict[str, Any] = dict(DatasetProcessRule.AUTOMATIC_RULES["segmentation"])
             character_splitter = EnhanceRecursiveCharacterTextSplitter.from_encoder(
-                chunk_size=DatasetProcessRule.AUTOMATIC_RULES["segmentation"]["max_tokens"],
-                chunk_overlap=DatasetProcessRule.AUTOMATIC_RULES["segmentation"]["chunk_overlap"],
+                chunk_size=automatic_rules["max_tokens"],
+                chunk_overlap=automatic_rules["chunk_overlap"],
                 separators=["\n\n", "。", ". ", " ", ""],
                 embedding_model_instance=embedding_model_instance,
             )
@@ -458,7 +464,7 @@ class IndexingRunner:
         """
         Split the text documents into nodes.
         """
-        all_documents = []
+        all_documents: list[Document] = []
         for text_doc in text_docs:
             # document clean
             document_text = self._document_clean(text_doc.page_content, processing_rule)
@@ -471,11 +477,11 @@ class IndexingRunner:
             for document in documents:
                 if document.page_content is None or not document.page_content.strip():
                     continue
-                doc_id = str(uuid.uuid4())
-                hash = helper.generate_text_hash(document.page_content)
-
-                document.metadata["doc_id"] = doc_id
-                document.metadata["doc_hash"] = hash
+                if document.metadata is not None:
+                    doc_id = str(uuid.uuid4())
+                    hash = helper.generate_text_hash(document.page_content)
+                    document.metadata["doc_id"] = doc_id
+                    document.metadata["doc_hash"] = hash
 
                 split_documents.append(document)
 
@@ -539,11 +545,11 @@ class IndexingRunner:
             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
                 futures = []
                 for i in range(0, len(documents), chunk_size):
-                    chunk_documents = documents[i : i + chunk_size]
+                    chunk_documents = documents[i: i + chunk_size]
                     futures.append(
                         executor.submit(
                             self._process_chunk,
-                            current_app._get_current_object(),
+                            current_app._get_current_object(),  # type: ignore
                             index_processor,
                             chunk_documents,
                             dataset,

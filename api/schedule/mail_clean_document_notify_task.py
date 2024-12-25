@@ -3,10 +3,8 @@ import time
 
 import click
 from celery import shared_task
-from flask import render_template
-
-from configs import dify_config
 from extensions.ext_mail import mail
+from flask import render_template
 from models.dataset import DatasetAutoDisableLog
 
 
@@ -32,7 +30,6 @@ def send_document_clean_notify_task():
             "clean_document_job_mail_template-US.html",
         )
         mail.send(to=to, subject="立即加入 Dify 工作空间", html=html_content)
-
 
         end_at = time.perf_counter()
         logging.info(

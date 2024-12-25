@@ -1,28 +1,29 @@
 import datetime
 
 import pytz
-from flask import request
-from flask_login import current_user
-from flask_restful import Resource, fields, marshal_with, reqparse
-
 from configs import dify_config
 from constants.languages import supported_language
 from controllers.console import api
 from controllers.console.workspace.error import (
-    AccountAlreadyInitedError,
-    CurrentPasswordIncorrectError,
-    InvalidInvitationCodeError,
-    RepeatPasswordNotMatchError,
-)
-from controllers.console.wraps import account_initialization_required, enterprise_license_required, setup_required
+    AccountAlreadyInitedError, CurrentPasswordIncorrectError,
+    InvalidAccountDeletionCodeError, InvalidInvitationCodeError,
+    RepeatPasswordNotMatchError)
+from controllers.console.wraps import (account_initialization_required,
+                                       enterprise_license_required,
+                                       setup_required)
 from extensions.ext_database import db
 from fields.member_fields import account_fields
+from flask import request
+from flask_login import current_user  # type: ignore
+from flask_restful import (Resource, fields, marshal_with,  # type: ignore
+                           reqparse)
 from libs.helper import TimestampField, timezone
 from libs.login import login_required
 from models import AccountIntegrate, InvitationCode
 from services.account_service import AccountService
 from services.billing_service import BillingService
-from services.errors.account import CurrentPasswordIncorrectError as ServiceCurrentPasswordIncorrectError
+from services.errors.account import \
+    CurrentPasswordIncorrectError as ServiceCurrentPasswordIncorrectError
 
 
 class AccountInitApi(Resource):
@@ -250,11 +251,8 @@ class AccountDeleteVerifyApi(Resource):
     def get(self):
         account = current_user
 
-        try:
-            token, code = AccountService.generate_account_deletion_verification_code(account)
-            AccountService.send_account_delete_verification_email(account, code)
-        except Exception as e:
-            return {"result": "fail", "error": str(e)}, 429
+        token, code = AccountService.generate_account_deletion_verification_code(account)
+        AccountService.send_account_delete_verification_email(account, code)
 
         return {"result": "success", "data": token}
 
@@ -269,13 +267,12 @@ class AccountDeleteApi(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument("token", type=str, required=True, location="json")
         parser.add_argument("code", type=str, required=True, location="json")
-        parser.add_argument("reason", type=str, required=True, location="json")
         args = parser.parse_args()
 
         if not AccountService.verify_account_deletion_code(args["token"], args["code"]):
-            raise ValueError("Invalid verification code.")
+            raise InvalidAccountDeletionCodeError()
 
-        AccountService.delete_account(account, args["reason"])
+        AccountService.delete_account(account)
 
         return {"result": "success"}
 

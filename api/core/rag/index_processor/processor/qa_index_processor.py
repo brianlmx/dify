@@ -7,9 +7,6 @@ import uuid
 from typing import Optional
 
 import pandas as pd
-from flask import Flask, current_app
-from werkzeug.datastructures import FileStorage
-
 from core.llm_generator.llm_generator import LLMGenerator
 from core.rag.cleaner.clean_processor import CleanProcessor
 from core.rag.datasource.retrieval_service import RetrievalService
@@ -19,9 +16,11 @@ from core.rag.extractor.extract_processor import ExtractProcessor
 from core.rag.index_processor.index_processor_base import BaseIndexProcessor
 from core.rag.models.document import Document
 from core.tools.utils.text_processing_utils import remove_leading_symbols
+from flask import Flask, current_app
 from libs import helper
 from models.dataset import Dataset
 from services.entities.knowledge_entities.knowledge_entities import Rule
+from werkzeug.datastructures import FileStorage
 
 
 class QAIndexProcessor(BaseIndexProcessor):
@@ -47,11 +46,11 @@ class QAIndexProcessor(BaseIndexProcessor):
         )
 
         # Split the text documents into nodes.
-        all_documents = []
-        all_qa_documents = []
+        all_documents: list[Document] = []
+        all_qa_documents: list[Document] = []
         for document in documents:
             # document clean
-            document_text = CleanProcessor.clean(document.page_content, kwargs.get("process_rule"))
+            document_text = CleanProcessor.clean(document.page_content, kwargs.get("process_rule") or {})
             document.page_content = document_text
 
             # parse document to nodes
@@ -61,23 +60,24 @@ class QAIndexProcessor(BaseIndexProcessor):
                 if document_node.page_content.strip():
                     doc_id = str(uuid.uuid4())
                     hash = helper.generate_text_hash(document_node.page_content)
-                    document_node.metadata["doc_id"] = doc_id
-                    document_node.metadata["doc_hash"] = hash
+                    if document_node.metadata is not None:
+                        document_node.metadata["doc_id"] = doc_id
+                        document_node.metadata["doc_hash"] = hash
                     # delete Splitter character
                     page_content = document_node.page_content
                     document_node.page_content = remove_leading_symbols(page_content)
                     split_documents.append(document_node)
             all_documents.extend(split_documents)
         if preview:
-            self._format_qa_document(current_app._get_current_object(), 
-                                     kwargs.get("tenant_id"), 
-                                     all_documents[0], 
-                                     all_qa_documents, 
+            self._format_qa_document(current_app._get_current_object(),
+                                     kwargs.get("tenant_id"),
+                                     all_documents[0],
+                                     all_qa_documents,
                                      kwargs.get("doc_language", "English"))
         else:
             for i in range(0, len(all_documents), 10):
                 threads = []
-                sub_documents = all_documents[i : i + 10]
+                sub_documents = all_documents[i: i + 10]
                 for doc in sub_documents:
                     document_format_thread = threading.Thread(
                         target=self._format_qa_document,
@@ -166,11 +166,12 @@ class QAIndexProcessor(BaseIndexProcessor):
                 qa_documents = []
                 for result in document_qa_list:
                     qa_document = Document(page_content=result["question"], metadata=document_node.metadata.copy())
-                    doc_id = str(uuid.uuid4())
-                    hash = helper.generate_text_hash(result["question"])
-                    qa_document.metadata["answer"] = result["answer"]
-                    qa_document.metadata["doc_id"] = doc_id
-                    qa_document.metadata["doc_hash"] = hash
+                    if qa_document.metadata is not None:
+                        doc_id = str(uuid.uuid4())
+                        hash = helper.generate_text_hash(result["question"])
+                        qa_document.metadata["answer"] = result["answer"]
+                        qa_document.metadata["doc_id"] = doc_id
+                        qa_document.metadata["doc_hash"] = hash
                     qa_documents.append(qa_document)
                 format_documents.extend(qa_documents)
             except Exception as e:

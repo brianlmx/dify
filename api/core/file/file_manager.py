@@ -4,13 +4,11 @@ from pathlib import Path
 
 from configs import dify_config
 from core.helper import ssrf_proxy
-from core.model_runtime.entities import (
-    AudioPromptMessageContent,
-    DocumentPromptMessageContent,
-    ImagePromptMessageContent,
-    MultiModalPromptMessageContent,
-    VideoPromptMessageContent,
-)
+from core.model_runtime.entities import (AudioPromptMessageContent,
+                                         DocumentPromptMessageContent,
+                                         ImagePromptMessageContent,
+                                         MultiModalPromptMessageContent,
+                                         VideoPromptMessageContent)
 from extensions.ext_storage import storage
 
 from . import helpers
@@ -57,7 +55,7 @@ def to_prompt_message_content(
     if f.type == FileType.IMAGE:
         params["detail"] = image_detail_config or ImagePromptMessageContent.DETAIL.LOW
 
-    prompt_class_map = {
+    prompt_class_map: Mapping[FileType, type[MultiModalPromptMessageContent]] = {
         FileType.IMAGE: ImagePromptMessageContent,
         FileType.AUDIO: AudioPromptMessageContent,
         FileType.VIDEO: VideoPromptMessageContent,
@@ -65,7 +63,7 @@ def to_prompt_message_content(
     }
 
     try:
-        return prompt_class_map[f.type](**params)
+        return prompt_class_map[f.type].model_validate(params)
     except KeyError:
         raise ValueError(f"file type {f.type} is not supported")
 

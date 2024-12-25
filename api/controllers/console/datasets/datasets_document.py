@@ -1,40 +1,25 @@
 import logging
 from argparse import ArgumentTypeError
 from datetime import UTC, datetime
-
-from flask import request
-from flask_login import current_user
-from flask_restful import Resource, fields, marshal, marshal_with, reqparse
-from sqlalchemy import asc, desc
-from transformers.hf_argparser import string_to_bool
-from werkzeug.exceptions import Forbidden, NotFound
+from typing import cast
 
 import services
 from controllers.console import api
 from controllers.console.app.error import (
-    ProviderModelCurrentlyNotSupportError,
-    ProviderNotInitializeError,
-    ProviderQuotaExceededError,
-)
-from controllers.console.datasets.error import (
-    ArchivedDocumentImmutableError,
-    DocumentAlreadyFinishedError,
-    DocumentIndexingError,
-    IndexingEstimateError,
-    InvalidActionError,
-    InvalidMetadataError,
-)
-from controllers.console.wraps import (
-    account_initialization_required,
-    cloud_edition_billing_resource_check,
-    setup_required,
-)
-from core.errors.error import (
-    LLMBadRequestError,
-    ModelCurrentlyNotSupportError,
-    ProviderTokenNotInitError,
-    QuotaExceededError,
-)
+    ProviderModelCurrentlyNotSupportError, ProviderNotInitializeError,
+    ProviderQuotaExceededError)
+from controllers.console.datasets.error import (ArchivedDocumentImmutableError,
+                                                DocumentAlreadyFinishedError,
+                                                DocumentIndexingError,
+                                                IndexingEstimateError,
+                                                InvalidActionError,
+                                                InvalidMetadataError)
+from controllers.console.wraps import (account_initialization_required,
+                                       cloud_edition_billing_resource_check,
+                                       setup_required)
+from core.errors.error import (LLMBadRequestError,
+                               ModelCurrentlyNotSupportError,
+                               ProviderTokenNotInitError, QuotaExceededError)
 from core.indexing_runner import IndexingRunner
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
@@ -42,18 +27,25 @@ from core.model_runtime.errors.invoke import InvokeAuthorizationError
 from core.rag.extractor.entity.extract_setting import ExtractSetting
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from fields.document_fields import (
-    dataset_and_document_fields,
-    document_fields,
-    document_status_fields,
-    document_with_segments_fields,
-)
+from fields.document_fields import (dataset_and_document_fields,
+                                    document_fields, document_status_fields,
+                                    document_with_segments_fields)
+from flask import request
+from flask_login import current_user  # type: ignore
+from flask_restful import (Resource, fields, marshal,  # type: ignore
+                           marshal_with, reqparse)
 from libs.login import login_required
-from models import Dataset, DatasetProcessRule, Document, DocumentSegment, UploadFile
+from models import (Dataset, DatasetProcessRule, Document, DocumentSegment,
+                    UploadFile)
 from services.dataset_service import DatasetService, DocumentService
-from services.entities.knowledge_entities.knowledge_entities import KnowledgeConfig
+from services.entities.knowledge_entities.knowledge_entities import \
+    KnowledgeConfig
+from sqlalchemy import asc, desc
 from tasks.add_document_to_index_task import add_document_to_index_task
-from tasks.remove_document_from_index_task import remove_document_from_index_task
+from tasks.remove_document_from_index_task import \
+    remove_document_from_index_task
+from transformers.hf_argparser import string_to_bool  # type: ignore
+from werkzeug.exceptions import Forbidden, NotFound
 
 
 class DocumentResource(Resource):
@@ -412,7 +404,7 @@ class DocumentIndexingEstimateApi(DocumentResource):
                 indexing_runner = IndexingRunner()
 
                 try:
-                    response = indexing_runner.indexing_estimate(
+                    estimate_response = indexing_runner.indexing_estimate(
                         current_user.current_tenant_id,
                         [extract_setting],
                         data_process_rule_dict,
@@ -420,6 +412,7 @@ class DocumentIndexingEstimateApi(DocumentResource):
                         "English",
                         dataset_id,
                     )
+                    return estimate_response.model_dump(), 200
                 except LLMBadRequestError:
                     raise ProviderNotInitializeError(
                         "No Embedding Model available. Please configure a valid provider "
@@ -441,7 +434,6 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
         dataset_id = str(dataset_id)
         batch = str(batch)
         documents = self.get_batch_documents(dataset_id, batch)
-        response = {"tokens": 0, "total_price": 0, "currency": "USD", "total_segments": 0, "preview": []}
         if not documents:
             return response, 200
         data_process_rule = documents[0].dataset_process_rule
@@ -521,6 +513,7 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
                     "English",
                     dataset_id,
                 )
+                return response.model_dump(), 200
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
                     "No Embedding Model available. Please configure a valid provider "
@@ -759,8 +752,7 @@ class DocumentMetadataApi(DocumentResource):
 
         if not isinstance(doc_metadata, dict):
             raise ValueError("doc_metadata must be a dictionary.")
-
-        metadata_schema = DocumentService.DOCUMENT_METADATA_SCHEMA[doc_type]
+        metadata_schema: dict = cast(dict, DocumentService.DOCUMENT_METADATA_SCHEMA[doc_type])
 
         document.doc_metadata = {}
         if doc_type == "others":
