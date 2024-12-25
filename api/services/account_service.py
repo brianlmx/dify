@@ -17,7 +17,7 @@ from constants.languages import language_timezone_mapping, languages
 from events.tenant_event import tenant_was_created
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from libs.helper import RateLimiter, TokenManager
+from libs.helper import RateLimiter, TokenManager, generate_string
 from libs.passport import PassportService
 from libs.password import compare_password, hash_password, valid_password
 from libs.rsa import generate_key_pair
@@ -32,6 +32,7 @@ from models.account import (
     TenantStatus,
 )
 from models.model import DifySetup
+from services.billing_service import BillingService
 from services.errors.account import (
     AccountAlreadyInTenantError,
     AccountLoginError,
@@ -50,6 +51,8 @@ from services.errors.account import (
 )
 from services.errors.workspace import WorkSpaceNotAllowedCreateError
 from services.feature_service import FeatureService
+from tasks.delete_account_task import delete_account_task
+from tasks.mail_account_deletion_task import send_account_deletion_verification_code
 from tasks.mail_email_code_login import send_email_code_login_mail_task
 from tasks.mail_invite_member_task import send_invite_member_mail_task
 from tasks.mail_reset_password_task import send_reset_password_mail_task
@@ -69,6 +72,9 @@ class AccountService:
     reset_password_rate_limiter = RateLimiter(prefix="reset_password_rate_limit", max_attempts=1, time_window=60 * 1)
     email_code_login_rate_limiter = RateLimiter(
         prefix="email_code_login_rate_limit", max_attempts=1, time_window=60 * 1
+    )
+    email_code_account_deletion_rate_limiter = RateLimiter(
+        prefix="email_code_account_deletion_rate_limit", max_attempts=1, time_window=60 * 1
     )
     LOGIN_MAX_ERROR_LIMITS = 5
 
@@ -201,6 +207,12 @@ class AccountService:
             from controllers.console.error import AccountNotFound
 
             raise AccountNotFound()
+
+        if dify_config.BILLING_ENABLED and BillingService.is_email_in_freeze(email):
+            raise AccountRegisterError(
+                "Unable to re-register the account because the deletion occurred less than 30 days ago"
+            )
+
         account = Account()
         account.email = email
         account.name = name
@@ -239,6 +251,42 @@ class AccountService:
         TenantService.create_owner_tenant_if_not_exist(account=account)
 
         return account
+
+    @staticmethod
+    def generate_account_deletion_verification_code(account: Account) -> tuple[str, str]:
+        code = generate_string(6)
+        token = TokenManager.generate_token(
+            account=account, token_type="account_deletion", additional_data={"code": code}
+        )
+        return token, code
+
+    @classmethod
+    def send_account_deletion_verification_email(cls, account: Account, code: str):
+        language, email = account.interface_language, account.email
+        if cls.email_code_account_deletion_rate_limiter.is_rate_limited(email):
+            from controllers.console.auth.error import EmailCodeAccountDeletionRateLimitExceededError
+
+            raise EmailCodeAccountDeletionRateLimitExceededError()
+
+        send_account_deletion_verification_code.delay(language=language, to=email, code=code)
+
+        cls.email_code_account_deletion_rate_limiter.increment_rate_limit(email)
+
+    @staticmethod
+    def verify_account_deletion_code(token: str, code: str) -> bool:
+        token_data = TokenManager.get_token_data(token, "account_deletion")
+        if token_data is None:
+            return False
+
+        if token_data["code"] != code:
+            return False
+
+        return True
+
+    @staticmethod
+    def delete_account(account: Account, reason="") -> None:
+        """Delete account. This method only adds a task to the queue for deletion."""
+        delete_account_task.delay(account.id, reason)
 
     @staticmethod
     def link_account_integrate(provider: str, open_id: str, account: Account) -> None:
@@ -372,6 +420,11 @@ class AccountService:
     @classmethod
     def get_reset_password_data(cls, token: str) -> Optional[dict[str, Any]]:
         return TokenManager.get_token_data(token, "reset_password")
+
+    @classmethod
+    def send_account_delete_verification_email(cls, account: Account, code: str):
+        language, email = account.interface_language, account.email
+        send_account_deletion_verification_code.delay(language=language, to=email, code=code)
 
     @classmethod
     def send_email_code_login_email(
@@ -796,6 +849,10 @@ class RegisterService:
     ) -> Account:
         db.session.begin_nested()
         """Register account"""
+        if dify_config.BILLING_ENABLED and BillingService.is_email_in_freeze(email):
+            raise AccountRegisterError(
+                "Unable to re-register the account because the deletion occurred less than 30 days ago"
+            )
         try:
             account = AccountService.create_account(
                 email=email,
