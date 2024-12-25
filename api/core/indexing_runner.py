@@ -8,9 +8,12 @@ import time
 import uuid
 from typing import Any, Optional, cast
 
+from flask import current_app
+from flask_login import current_user
+from sqlalchemy.orm.exc import ObjectDeletedError
+
 from configs import dify_config
-from core.entities.knowledge_entities import (IndexingEstimate, PreviewDetail,
-                                              QAPreviewDetail)
+from core.entities.knowledge_entities import IndexingEstimate, PreviewDetail, QAPreviewDetail
 from core.errors.error import ProviderTokenNotInitError
 from core.model_manager import ModelInstance, ModelManager
 from core.model_runtime.entities.model_entities import ModelType
@@ -20,25 +23,22 @@ from core.rag.docstore.dataset_docstore import DatasetDocumentStore
 from core.rag.extractor.entity.extract_setting import ExtractSetting
 from core.rag.index_processor.constant.index_type import IndexType
 from core.rag.index_processor.index_processor_base import BaseIndexProcessor
-from core.rag.index_processor.index_processor_factory import \
-    IndexProcessorFactory
+from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
 from core.rag.models.document import ChildDocument, Document
 from core.rag.splitter.fixed_text_splitter import (
-    EnhanceRecursiveCharacterTextSplitter, FixedRecursiveCharacterTextSplitter)
+    EnhanceRecursiveCharacterTextSplitter,
+    FixedRecursiveCharacterTextSplitter,
+)
 from core.rag.splitter.text_splitter import TextSplitter
 from core.tools.utils.web_reader_tool import get_image_upload_file_ids
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
 from extensions.ext_storage import storage
-from flask import current_app
-from flask_login import current_user
 from libs import helper
-from models.dataset import ChildChunk, Dataset, DatasetProcessRule
+from models.dataset import ChildChunk, Dataset, DatasetProcessRule, DocumentSegment
 from models.dataset import Document as DatasetDocument
-from models.dataset import DocumentSegment
 from models.model import UploadFile
 from services.feature_service import FeatureService
-from sqlalchemy.orm.exc import ObjectDeletedError
 
 
 class IndexingRunner:
@@ -293,15 +293,15 @@ class IndexingRunner:
                 process_rule=processing_rule.to_dict(),
                 tenant_id=current_user.current_tenant_id,
                 doc_language=doc_language,
-                preview=True
+                preview=True,
             )
             total_segments += len(documents)
             for document in documents:
                 if len(preview_texts) < 10:
                     if doc_form and doc_form == "qa_model":
-                        preview_detail = QAPreviewDetail(question=document.page_content,
-                                                         answer=document.metadata.get("answer")
-                                                         )
+                        preview_detail = QAPreviewDetail(
+                            question=document.page_content, answer=document.metadata.get("answer")
+                        )
                         preview_texts.append(preview_detail)
                     else:
                         preview_detail = PreviewDetail(content=document.page_content)
@@ -324,9 +324,7 @@ class IndexingRunner:
                     db.session.delete(image_file)
 
         if doc_form and doc_form == "qa_model":
-            return IndexingEstimate(
-                total_segments=total_segments * 20, qa_preview=preview_texts, preview=[]
-            )
+            return IndexingEstimate(total_segments=total_segments * 20, qa_preview=preview_texts, preview=[])
         return IndexingEstimate(total_segments=total_segments, preview=preview_texts)
 
     def _extract(
@@ -545,7 +543,7 @@ class IndexingRunner:
             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
                 futures = []
                 for i in range(0, len(documents), chunk_size):
-                    chunk_documents = documents[i: i + chunk_size]
+                    chunk_documents = documents[i : i + chunk_size]
                     futures.append(
                         executor.submit(
                             self._process_chunk,

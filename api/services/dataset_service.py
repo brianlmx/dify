@@ -6,6 +6,10 @@ import time
 import uuid
 from typing import Any, Optional
 
+from flask_login import current_user  # type: ignore
+from sqlalchemy import func
+from werkzeug.exceptions import NotFound
+
 from configs import dify_config
 from core.errors.error import LLMBadRequestError, ProviderTokenNotInitError
 from core.model_manager import ModelManager
@@ -16,21 +20,32 @@ from events.dataset_event import dataset_was_deleted
 from events.document_event import document_was_deleted
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from flask_login import current_user  # type: ignore
 from libs import helper
 from models.account import Account, TenantAccountRole
-from models.dataset import (AppDatasetJoin, ChildChunk, Dataset,
-                            DatasetAutoDisableLog, DatasetCollectionBinding,
-                            DatasetPermission, DatasetPermissionEnum,
-                            DatasetProcessRule, DatasetQuery, Document,
-                            DocumentSegment, ExternalKnowledgeBindings)
+from models.dataset import (
+    AppDatasetJoin,
+    ChildChunk,
+    Dataset,
+    DatasetAutoDisableLog,
+    DatasetCollectionBinding,
+    DatasetPermission,
+    DatasetPermissionEnum,
+    DatasetProcessRule,
+    DatasetQuery,
+    Document,
+    DocumentSegment,
+    ExternalKnowledgeBindings,
+)
 from models.model import UploadFile
 from models.source import DataSourceOauthBinding
 from services.entities.knowledge_entities.knowledge_entities import (
-    ChildChunkUpdateArgs, KnowledgeConfig, RetrievalModel, SegmentUpdateArgs)
+    ChildChunkUpdateArgs,
+    KnowledgeConfig,
+    RetrievalModel,
+    SegmentUpdateArgs,
+)
 from services.errors.account import InvalidActionError, NoPermissionError
-from services.errors.chunk import (ChildChunkDeleteIndexError,
-                                   ChildChunkIndexingError)
+from services.errors.chunk import ChildChunkDeleteIndexError, ChildChunkIndexingError
 from services.errors.dataset import DatasetNameDuplicateError
 from services.errors.document import DocumentIndexingError
 from services.errors.file import FileNotExistsError
@@ -38,25 +53,19 @@ from services.external_knowledge_service import ExternalDatasetService
 from services.feature_service import FeatureModel, FeatureService
 from services.tag_service import TagService
 from services.vector_service import VectorService
-from sqlalchemy import func
 from tasks.batch_clean_document_task import batch_clean_document_task
 from tasks.clean_notion_document_task import clean_notion_document_task
 from tasks.deal_dataset_vector_index_task import deal_dataset_vector_index_task
 from tasks.delete_segment_from_index_task import delete_segment_from_index_task
-from tasks.disable_segment_from_index_task import \
-    disable_segment_from_index_task
-from tasks.disable_segments_from_index_task import \
-    disable_segments_from_index_task
+from tasks.disable_segment_from_index_task import disable_segment_from_index_task
+from tasks.disable_segments_from_index_task import disable_segments_from_index_task
 from tasks.document_indexing_task import document_indexing_task
 from tasks.document_indexing_update_task import document_indexing_update_task
-from tasks.duplicate_document_indexing_task import \
-    duplicate_document_indexing_task
+from tasks.duplicate_document_indexing_task import duplicate_document_indexing_task
 from tasks.enable_segments_to_index_task import enable_segments_to_index_task
 from tasks.recover_document_indexing_task import recover_document_indexing_task
 from tasks.retry_document_indexing_task import retry_document_indexing_task
-from tasks.sync_website_document_indexing_task import \
-    sync_website_document_indexing_task
-from werkzeug.exceptions import NotFound
+from tasks.sync_website_document_indexing_task import sync_website_document_indexing_task
 
 
 class DatasetService:

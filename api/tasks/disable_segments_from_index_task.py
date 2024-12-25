@@ -3,13 +3,12 @@ import time
 
 import click
 from celery import shared_task
-from core.rag.index_processor.index_processor_factory import \
-    IndexProcessorFactory
+
+from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from models.dataset import Dataset
+from models.dataset import Dataset, DocumentSegment
 from models.dataset import Document as DatasetDocument
-from models.dataset import DocumentSegment
 
 
 @shared_task(queue="dataset")

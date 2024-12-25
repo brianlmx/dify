@@ -4,11 +4,13 @@ from pathlib import Path
 
 from configs import dify_config
 from core.helper import ssrf_proxy
-from core.model_runtime.entities import (AudioPromptMessageContent,
-                                         DocumentPromptMessageContent,
-                                         ImagePromptMessageContent,
-                                         MultiModalPromptMessageContent,
-                                         VideoPromptMessageContent)
+from core.model_runtime.entities import (
+    AudioPromptMessageContent,
+    DocumentPromptMessageContent,
+    ImagePromptMessageContent,
+    MultiModalPromptMessageContent,
+    VideoPromptMessageContent,
+)
 from extensions.ext_storage import storage
 
 from . import helpers

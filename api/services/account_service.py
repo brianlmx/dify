@@ -8,6 +8,10 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from typing import Any, Optional, cast
 
+from pydantic import BaseModel
+from sqlalchemy import func
+from werkzeug.exceptions import Unauthorized
+
 from configs import dify_config
 from constants.languages import language_timezone_mapping, languages
 from events.tenant_event import tenant_was_created
@@ -17,34 +21,41 @@ from libs.helper import RateLimiter, TokenManager, generate_string
 from libs.passport import PassportService
 from libs.password import compare_password, hash_password, valid_password
 from libs.rsa import generate_key_pair
-from models.account import (Account, AccountIntegrate, AccountStatus, Tenant,
-                            TenantAccountJoin, TenantAccountJoinRole,
-                            TenantAccountRole, TenantStatus)
+from models.account import (
+    Account,
+    AccountIntegrate,
+    AccountStatus,
+    Tenant,
+    TenantAccountJoin,
+    TenantAccountJoinRole,
+    TenantAccountRole,
+    TenantStatus,
+)
 from models.model import DifySetup
-from pydantic import BaseModel
 from services.billing_service import BillingService
-from services.errors.account import (AccountAlreadyInTenantError,
-                                     AccountLoginError, AccountNotFoundError,
-                                     AccountNotLinkTenantError,
-                                     AccountPasswordError,
-                                     AccountRegisterError,
-                                     CannotOperateSelfError,
-                                     CurrentPasswordIncorrectError,
-                                     InvalidActionError,
-                                     LinkAccountIntegrateError,
-                                     MemberNotInTenantError, NoPermissionError,
-                                     RoleAlreadyAssignedError,
-                                     TenantNotFoundError)
+from services.errors.account import (
+    AccountAlreadyInTenantError,
+    AccountLoginError,
+    AccountNotFoundError,
+    AccountNotLinkTenantError,
+    AccountPasswordError,
+    AccountRegisterError,
+    CannotOperateSelfError,
+    CurrentPasswordIncorrectError,
+    InvalidActionError,
+    LinkAccountIntegrateError,
+    MemberNotInTenantError,
+    NoPermissionError,
+    RoleAlreadyAssignedError,
+    TenantNotFoundError,
+)
 from services.errors.workspace import WorkSpaceNotAllowedCreateError
 from services.feature_service import FeatureService
-from sqlalchemy import func
 from tasks.delete_account_task import delete_account_task
-from tasks.mail_account_deletion_task import \
-    send_account_deletion_verification_code
+from tasks.mail_account_deletion_task import send_account_deletion_verification_code
 from tasks.mail_email_code_login import send_email_code_login_mail_task
 from tasks.mail_invite_member_task import send_invite_member_mail_task
 from tasks.mail_reset_password_task import send_reset_password_mail_task
-from werkzeug.exceptions import Unauthorized
 
 
 class TokenPair(BaseModel):
@@ -253,8 +264,7 @@ class AccountService:
     def send_account_deletion_verification_email(cls, account: Account, code: str):
         language, email = account.interface_language, account.email
         if cls.email_code_account_deletion_rate_limiter.is_rate_limited(email):
-            from controllers.console.auth.error import \
-                EmailCodeAccountDeletionRateLimitExceededError
+            from controllers.console.auth.error import EmailCodeAccountDeletionRateLimitExceededError
 
             raise EmailCodeAccountDeletionRateLimitExceededError()
 
@@ -389,8 +399,7 @@ class AccountService:
             raise ValueError("Email must be provided.")
 
         if cls.reset_password_rate_limiter.is_rate_limited(account_email):
-            from controllers.console.auth.error import \
-                PasswordResetRateLimitExceededError
+            from controllers.console.auth.error import PasswordResetRateLimitExceededError
 
             raise PasswordResetRateLimitExceededError()
 
@@ -426,8 +435,7 @@ class AccountService:
         if email is None:
             raise ValueError("Email must be provided.")
         if cls.email_code_login_rate_limiter.is_rate_limited(email):
-            from controllers.console.auth.error import \
-                EmailCodeLoginRateLimitExceededError
+            from controllers.console.auth.error import EmailCodeLoginRateLimitExceededError
 
             raise EmailCodeLoginRateLimitExceededError()
 

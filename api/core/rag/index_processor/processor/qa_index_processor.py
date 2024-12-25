@@ -7,6 +7,9 @@ import uuid
 from typing import Optional
 
 import pandas as pd
+from flask import Flask, current_app
+from werkzeug.datastructures import FileStorage
+
 from core.llm_generator.llm_generator import LLMGenerator
 from core.rag.cleaner.clean_processor import CleanProcessor
 from core.rag.datasource.retrieval_service import RetrievalService
@@ -16,11 +19,9 @@ from core.rag.extractor.extract_processor import ExtractProcessor
 from core.rag.index_processor.index_processor_base import BaseIndexProcessor
 from core.rag.models.document import Document
 from core.tools.utils.text_processing_utils import remove_leading_symbols
-from flask import Flask, current_app
 from libs import helper
 from models.dataset import Dataset
 from services.entities.knowledge_entities.knowledge_entities import Rule
-from werkzeug.datastructures import FileStorage
 
 
 class QAIndexProcessor(BaseIndexProcessor):
@@ -69,15 +70,17 @@ class QAIndexProcessor(BaseIndexProcessor):
                     split_documents.append(document_node)
             all_documents.extend(split_documents)
         if preview:
-            self._format_qa_document(current_app._get_current_object(),
-                                     kwargs.get("tenant_id"),
-                                     all_documents[0],
-                                     all_qa_documents,
-                                     kwargs.get("doc_language", "English"))
+            self._format_qa_document(
+                current_app._get_current_object(),
+                kwargs.get("tenant_id"),
+                all_documents[0],
+                all_qa_documents,
+                kwargs.get("doc_language", "English"),
+            )
         else:
             for i in range(0, len(all_documents), 10):
                 threads = []
-                sub_documents = all_documents[i: i + 10]
+                sub_documents = all_documents[i : i + 10]
                 for doc in sub_documents:
                     document_format_thread = threading.Thread(
                         target=self._format_qa_document,

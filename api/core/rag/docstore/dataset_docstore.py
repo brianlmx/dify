@@ -1,12 +1,13 @@
 from collections.abc import Sequence
 from typing import Any, Optional
 
+from sqlalchemy import func
+
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from core.rag.models.document import Document
 from extensions.ext_database import db
 from models.dataset import ChildChunk, Dataset, DocumentSegment
-from sqlalchemy import func
 
 
 class DatasetDocumentStore:

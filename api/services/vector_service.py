@@ -5,13 +5,11 @@ from core.model_runtime.entities.model_entities import ModelType
 from core.rag.datasource.keyword.keyword_factory import Keyword
 from core.rag.datasource.vdb.vector_factory import Vector
 from core.rag.index_processor.constant.index_type import IndexType
-from core.rag.index_processor.index_processor_factory import \
-    IndexProcessorFactory
+from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
 from core.rag.models.document import Document
 from extensions.ext_database import db
-from models.dataset import ChildChunk, Dataset, DatasetProcessRule
+from models.dataset import ChildChunk, Dataset, DatasetProcessRule, DocumentSegment
 from models.dataset import Document as DatasetDocument
-from models.dataset import DocumentSegment
 from services.entities.knowledge_entities.knowledge_entities import ParentMode
 
 

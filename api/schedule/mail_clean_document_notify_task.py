@@ -3,8 +3,9 @@ import time
 
 import click
 from celery import shared_task
-from extensions.ext_mail import mail
 from flask import render_template
+
+from extensions.ext_mail import mail
 from models.dataset import DatasetAutoDisableLog
 
 
@@ -18,9 +19,7 @@ def send_document_clean_notify_task():
     if not mail.is_inited():
         return
 
-    logging.info(
-        click.style("Start send document clean notify mail", fg="green")
-    )
+    logging.info(click.style("Start send document clean notify mail", fg="green"))
     start_at = time.perf_counter()
 
     # send document clean notify mail
@@ -33,9 +32,7 @@ def send_document_clean_notify_task():
 
         end_at = time.perf_counter()
         logging.info(
-            click.style(
-                "Send document clean notify mail succeeded: latency: {}".format(end_at - start_at), fg="green"
-            )
+            click.style("Send document clean notify mail succeeded: latency: {}".format(end_at - start_at), fg="green")
         )
     except Exception:
         logging.exception("Send invite member mail to {} failed".format(to))
