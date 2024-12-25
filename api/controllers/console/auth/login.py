@@ -199,7 +199,7 @@ class EmailCodeLoginApi(Resource):
             except WorkSpaceNotAllowedCreateError:
                 return NotAllowedCreateWorkspace()
             except AccountRegisterError as re:
-                return AccountOnRegisterError(description=str(re))
+                raise AccountOnRegisterError(description=str(re))
         token_pair = AccountService.login(account, ip_address=extract_remote_ip(request))
         AccountService.reset_login_error_rate_limit(args["email"])
         return {"result": "success", "data": token_pair.model_dump()}
