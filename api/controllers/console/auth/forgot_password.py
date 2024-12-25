@@ -125,8 +125,8 @@ class ForgotPasswordResetApi(Resource):
                 )
             except WorkSpaceNotAllowedCreateError:
                 pass
-            except AccountRegisterError as e:
-                return AccountOnRegisterError(message=str(e))
+            except AccountRegisterError as re:
+                return AccountOnRegisterError(message=str(re))
 
         return {"result": "success"}
 
