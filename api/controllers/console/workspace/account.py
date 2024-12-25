@@ -291,7 +291,7 @@ class AccountDeleleUpdateFeedbackApi(Resource):
         parser.add_argument("feedback", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        BillingService.update_account_eletion_feedback(args["email"], args["feedback"])
+        BillingService.update_account_deletion_feedback(args["email"], args["feedback"])
 
         return {"result": "success"}
 
